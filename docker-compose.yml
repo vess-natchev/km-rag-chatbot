@@ -1,0 +1,110 @@
+services:
+  # ChromaDB Vector Store
+  chromadb:
+    build: 
+      context: .
+      dockerfile: Dockerfile.chromadb
+    image: chromadb/chroma:1.2.1
+    container_name: org-chromadb
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/data
+      - ANONYMIZED_TELEMETRY=FALSE
+      - LOG_LEVEL=DEBUG
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/data
+    user: "0:0"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v2/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - org-network
+    restart: unless-stopped
+
+  # FastAPI RAG Backend
+  rag-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: org-rag-backend
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - CHROMA_COLLECTION_NAME=org_documents
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+    ports:
+      - "8001:8000"
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - .:/app
+    networks:
+      - org-network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # LibreChat Frontend
+  librechat:
+    image: ghcr.io/danny-avila/librechat-dev:latest
+    container_name: org-librechat
+    ports:
+      - "3080:3080"
+    depends_on:
+      - mongo
+      - rag-backend
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://root:${MONGO_DEV_PASSWORD}@mongo:27017/LibreChat?authSource=admin
+      - DOMAIN_CLIENT=${DOMAIN_CLIENT}
+      - DOMAIN_SERVER=${DOMAIN_SERVER}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - RAG_API_URL=http://rag-backend:8000
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - CREDS_KEY=${CREDS_KEY}
+      - CREDS_IV=${CREDS_IV}
+      - ALLOW_REGISTRATION=true
+      - ALLOW_EMAIL_LOGIN=true
+      - ALLOW_SOCIAL_LOGIN=false
+      - ALLOW_SOCIAL_REGISTRATION=false
+      - CUSTOM_CONFIG_PATH=/app/librechat.yaml
+    volumes:
+      - ./librechat.yaml:/app/librechat.yaml
+      - librechat_data:/app/client/public/images
+    networks:
+      - org-network
+    restart: unless-stopped
+
+  # MongoDB for LibreChat
+  mongo:
+    image: mongo:6.0
+    container_name: org-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_DEV_PASSWORD}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - org-network
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+  mongo_data:
+  librechat_data:
+
+networks:
+  org-network:
+    driver: bridge

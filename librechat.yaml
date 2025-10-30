@@ -1,0 +1,47 @@
+version: 1.2.9
+cache: true
+
+endpoints:
+  custom:
+    - name: "Org Knowledge Base"
+      apiKey: "${OPENAI_API_KEY}"
+      baseURL: "http://rag-backend:8000/v1"
+      models:
+        default: [
+          "org-knowledge-assistant"
+        ]
+      titleConvo: false
+      # titleModel: "gpt-5-chat-latest"
+      summarize: false
+      # summaryModel: "gpt-5-chat-latest"
+      forcePrompt: false
+      modelDisplayLabel: "Org KB"
+      
+  openAI:
+    apiKey: "${OPENAI_API_KEY}"
+    models:
+      default: [
+        "gpt-5-chat-latest"
+      ]
+    titleConvo: true
+    titleModel: "gpt-5-chat-latest"
+
+fileConfig:
+  endpoints:
+    openAI:
+      fileLimit: 5
+      fileSizeLimit: 10  # MB
+      totalSizeLimit: 50  # MB
+      supportedMimeTypes:
+        - "text/plain"
+        - "text/markdown"
+        - "text/csv"
+        - "application/json"
+        - "application/pdf"
+
+rateLimits:
+  fileUploads:
+    ipMax: 100
+    ipWindowInMinutes: 60
+    userMax: 50
+    userWindowInMinutes: 60
