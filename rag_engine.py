@@ -440,6 +440,7 @@ class RAGEngine:
                 rag_logger.info(f"Applied Filters: {filters}")
             
             # Calculate how many candidates to retrieve
+            max_results = settings.VECTOR_TOP_K
             retrieval_limit = max_results * settings.VECTOR_RERANK_MULTIPLIER if settings.USE_RERANKER else max_results
             
             # Generate embedding for the query
